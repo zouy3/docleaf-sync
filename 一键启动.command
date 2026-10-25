@@ -59,7 +59,11 @@ if curl -fsS http://localhost:3000/ >/dev/null 2>&1; then
   say "阅读器已经运行。"
 else
   say "正在启动阅读器…"
-  npm run dev &
+  if [[ -f dist/server/index.js ]]; then
+    npm run start &
+  else
+    npm run dev &
+  fi
   web_pid=$!
 fi
 

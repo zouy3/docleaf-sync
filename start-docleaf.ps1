@@ -58,7 +58,8 @@ else {
 
 if (-not (Test-Url "http://localhost:3000/")) {
     Write-Host "[DocLeaf] Starting the reader..." -ForegroundColor Cyan
-    $webCommand = 'cd /d "' + $projectDir + '" && npm run dev'
+    $webScript = if (Test-Path -LiteralPath "dist/server/index.js") { "start" } else { "dev" }
+    $webCommand = 'cd /d "' + $projectDir + '" && npm run ' + $webScript
     Start-Process -FilePath "cmd.exe" -ArgumentList @("/k", $webCommand) | Out-Null
 }
 else {

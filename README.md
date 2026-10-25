@@ -4,7 +4,18 @@ Word 风格的网页阅读器 + Android 纯文字小说客户端，共用账号�
 
 ## 当前状态
 
-同步客户端已实现，仍属试用版。离线队列、账号隔离和进度冲突有自动化测试；真实账号的网页 ↔ Android 续读、真机后台恢复尚待验收。不要把构建成功当作双端同步已验收。当前仓库不提供预编译 Release，请勿从旧仓库下载后以为已包含同步功能。
+同步客户端已实现，仍属试用版。离线队列、账号隔离和进度冲突有自动化测试；真实账号的网页 ↔ Android 续读、真机后台恢复尚待验收。不要把构建成功当作双端同步已验收，也不要从旧仓库下载后以为已包含同步功能。
+
+## 预编译运行包
+
+在本仓库 [Releases](https://github.com/zouy3/docleaf-sync/releases) 下载对应文件；网页包由 [发布工作流](https://github.com/zouy3/docleaf-sync/actions/workflows/release-preview.yml) 构建，构建完成后才会出现附件。
+
+- Windows：`DocLeaf-Sync-Windows-x64.zip`
+- Mac M 系列：`DocLeaf-Sync-macOS-Apple-Silicon.zip`
+- Mac Intel：`DocLeaf-Sync-macOS-Intel.zip`
+- 安卓：`DocLeaf-Sync-1.0.132-arm64-v8a.apk`（多数手机）或 `armeabi-v7a.apk`（32 位）
+
+网页包已带编译好的书源及网页构建产物，无需 Rust、Flutter 或 C++ 构建工具，仍需 Node.js 22.13+ 和首次依赖下载。完整解压后运行启动器；先关闭旧版服务，防止仍打开旧的 localhost:3000 页面。不要把 GitHub 自动生成的 Source code ZIP 当成运行包。
 
 ## 同步哪些内容
 

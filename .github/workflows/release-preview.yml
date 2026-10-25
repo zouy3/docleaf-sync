@@ -1,0 +1,95 @@
+name: Publish sync preview packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/release-preview.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-preview-release
+  cancel-in-progress: false
+
+jobs:
+  web:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            suffix: Windows-x64
+          - runner: macos-15
+            suffix: macOS-Apple-Silicon
+          - runner: macos-15-intel
+            suffix: macOS-Intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: integrations/fqapp/rust
+          key: ${{ matrix.suffix }}
+      - name: Install and validate web reader
+        run: npm ci
+      - run: npm test
+      - name: Build bundled source service
+        run: cargo build --release --locked --manifest-path integrations/fqapp/rust/Cargo.toml --bin docleaf_bridge
+      - name: Package Windows reader
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force staging | Out-Null
+          node scripts/package-web-release.mjs staging/DocLeaf-Sync integrations/fqapp/rust/target/release/docleaf_bridge.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Compress-Archive -Path staging/DocLeaf-Sync -DestinationPath DocLeaf-Sync-${{ matrix.suffix }}.zip -CompressionLevel Optimal
+      - name: Package macOS reader
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          node scripts/package-web-release.mjs staging/DocLeaf-Sync integrations/fqapp/rust/target/release/docleaf_bridge
+          ditto -c -k --keepParent staging/DocLeaf-Sync DocLeaf-Sync-${{ matrix.suffix }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ matrix.suffix }}
+          path: DocLeaf-Sync-${{ matrix.suffix }}.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: web
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: web-*
+          path: release-assets
+          merge-multiple: true
+      - name: Publish versioned preview without replacing existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: sync-preview-2026-10-25
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release-assets
+          sha256sum *.zip > SHA256SUMS-web.txt
+          cd ..
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "DocLeaf Sync · 同步试用版 2026-10-25" --prerelease --notes-file release-notes.md
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --repo "$GITHUB_REPOSITORY"
