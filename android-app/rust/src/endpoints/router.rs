@@ -1,0 +1,337 @@
+//! REST path matching. Port of `router.go` `matchRESTPath`.
+//!
+//! Every request must address an endpoint through its `/api/v1/...` path; the
+//! legacy `?api=<name>` query form is not honored.
+
+use super::{Params, INTERNAL_DEVICE_PIN_KEY};
+
+pub struct RouteMatch {
+    pub api: &'static str,
+    pub params: Params,
+}
+
+fn set_query_alias(q: &mut Params, target: &str, alias: &str) {
+    if !q.get_str(target).is_empty() {
+        return;
+    }
+    let v = q.get_str(alias);
+    if !v.is_empty() {
+        q.set(target, v);
+    }
+}
+
+pub fn match_rest_path(path: &str, query: &Params) -> Option<RouteMatch> {
+    let path = path.strip_suffix('/').unwrap_or(path);
+    let rest = path.strip_prefix("/api/v1/")?;
+    let parts: Vec<&str> = rest.split('/').collect();
+    if parts.is_empty() || parts[0].is_empty() {
+        return None;
+    }
+    let tail = &parts[1..];
+    match parts[0] {
+        "chapters" => match_chapters(tail, query),
+        "books" => match_books(tail, query),
+        "novels" => match_novels(tail, query),
+        "search" => match_search(tail, query),
+        "authors" => match_authors(tail, query),
+        "recommend" => match_recommend(tail, query),
+        "rank" => match_rank(tail, query),
+        "articles" => match_articles(tail, query),
+        "items" => match_items(tail, query),
+        "comments" => match_comments(tail, query),
+        "forum-id" => Some(RouteMatch {
+            api: "forum_id",
+            params: query.clone(),
+        }),
+        _ => None,
+    }
+}
+
+fn match_chapters(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut p = q.clone();
+    match parts[0] {
+        "batch" => {
+            p.set("api_type", "batch");
+            return Some(RouteMatch {
+                api: "content",
+                params: p,
+            });
+        }
+        "full" => {
+            return Some(RouteMatch {
+                api: "full",
+                params: p,
+            })
+        }
+        _ => {}
+    }
+
+    let id = parts[0];
+    if parts.len() == 1 {
+        p.set("item_ids", id);
+        return Some(RouteMatch {
+            api: "content",
+            params: p,
+        });
+    }
+    match parts[1] {
+        "novel" => {
+            p.set("item_ids", id);
+            p.set("api_type", "novel");
+            Some(RouteMatch {
+                api: "content",
+                params: p,
+            })
+        }
+        "toutiao" => {
+            p.set("item_ids", id);
+            Some(RouteMatch {
+                api: "toutiao",
+                params: p,
+            })
+        }
+        "reviews" => {
+            p.set("item_id", id);
+            Some(RouteMatch {
+                api: "idea_list",
+                params: p,
+            })
+        }
+        "paragraphs" => {
+            if parts.len() >= 4 {
+                p.set("item_id", id);
+                p.set("para_index", parts[2]);
+                match parts[3] {
+                    "reviews" | "short-reviews" => Some(RouteMatch {
+                        api: "idea_list",
+                        params: p,
+                    }),
+                    _ => None,
+                }
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn match_books(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let id = parts[0];
+    let mut p = q.clone();
+    p.set("book_id", id);
+
+    if parts.len() == 1 {
+        return Some(RouteMatch {
+            api: "book_detail_legacy",
+            params: p,
+        });
+    }
+    match parts[1] {
+        "directory" => {
+            if parts.len() >= 3 {
+                match parts[2] {
+                    "novel" => {
+                        p.set("api_type", "novel");
+                        return Some(RouteMatch {
+                            api: "directory",
+                            params: p,
+                        });
+                    }
+                    "fanqie" => {
+                        return Some(RouteMatch {
+                            api: "book",
+                            params: p,
+                        })
+                    }
+                    _ => {}
+                }
+            }
+            Some(RouteMatch {
+                api: "directory",
+                params: p,
+            })
+        }
+        "detail" => Some(RouteMatch {
+            api: "book_detail_legacy",
+            params: p,
+        }),
+        "comments" => Some(RouteMatch {
+            api: "book_comments_legacy",
+            params: p,
+        }),
+        "share" => Some(RouteMatch {
+            api: "book_share",
+            params: p,
+        }),
+        "reviews" => Some(RouteMatch {
+            api: "book_reviews",
+            params: p,
+        }),
+        "chapters" => {
+            if parts.len() >= 3 && parts[2] == "summary" {
+                Some(RouteMatch {
+                    api: "chapter_summary",
+                    params: p,
+                })
+            } else {
+                None
+            }
+        }
+        "related" => Some(RouteMatch {
+            api: "related",
+            params: p,
+        }),
+        _ => None,
+    }
+}
+
+fn match_novels(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut p = q.clone();
+    p.set("post_id", parts[0]);
+    Some(RouteMatch {
+        api: "novel_detail",
+        params: p,
+    })
+}
+
+fn match_search(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    let mut p = q.clone();
+    if parts.is_empty() {
+        return Some(RouteMatch {
+            api: "search",
+            params: p,
+        });
+    }
+    match parts[0] {
+        "fanqie" => {
+            p.set("search_type", "fanqie");
+            set_query_alias(&mut p, "query", "q");
+            Some(RouteMatch {
+                api: "search",
+                params: p,
+            })
+        }
+        "suggest" => {
+            set_query_alias(&mut p, "keyword", "q");
+            Some(RouteMatch {
+                api: "search_predict",
+                params: p,
+            })
+        }
+        "hot" => Some(RouteMatch {
+            api: "hot_search",
+            params: p,
+        }),
+        _ => None,
+    }
+}
+
+fn match_authors(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut p = q.clone();
+    p.set("author_id", parts[0]);
+    if parts.len() == 1 {
+        return Some(RouteMatch {
+            api: "author_info",
+            params: p,
+        });
+    }
+    if parts[1] == "bookshelf" {
+        return Some(RouteMatch {
+            api: "author_bookshelf",
+            params: p,
+        });
+    }
+    None
+}
+
+fn match_recommend(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() || parts[0] == "homepage" {
+        return Some(RouteMatch {
+            api: "homepage_recommend",
+            params: q.clone(),
+        });
+    }
+    // 服务端频道表（`BookstoreTabData.title` / `tab_type`）。
+    if parts[0] == "channels" {
+        return Some(RouteMatch {
+            api: "channel_tabs",
+            params: q.clone(),
+        });
+    }
+    None
+}
+
+fn match_rank(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut p = q.clone();
+    p.set("rank_id", parts[0]);
+    Some(RouteMatch {
+        api: "rank_data",
+        params: p,
+    })
+}
+
+fn match_articles(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut p = q.clone();
+    p.set("item_ids", parts[0]);
+    Some(RouteMatch {
+        api: "toutiao_article",
+        params: p,
+    })
+}
+
+fn match_items(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut p = q.clone();
+    p.set("item_ids", parts[0]);
+    Some(RouteMatch {
+        api: "item_info",
+        params: p,
+    })
+}
+
+fn match_comments(parts: &[&str], q: &Params) -> Option<RouteMatch> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut p = q.clone();
+    if parts.len() < 2 {
+        return None;
+    }
+    p.set("comment_id", parts[0]);
+    if parts[1] == "replies" {
+        return Some(RouteMatch {
+            api: "comment_replies",
+            params: p,
+        });
+    }
+    None
+}
+
+/// Router-level device pinning helper (see `device_session.go`).
+pub async fn pin_from_session(q: &mut Params, pool: &crate::device::DevicePool) -> Option<String> {
+    let session_id = q.get_str("session_id");
+    let pin = super::session::device_key_from_session(&session_id, pool).await?;
+    q.set(INTERNAL_DEVICE_PIN_KEY, pin.clone());
+    Some(pin)
+}
