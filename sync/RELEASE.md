@@ -14,11 +14,12 @@
 - 校正了 Mac ZIP 的中文文件名 UTF-8 标志，验证重打包前后所有文件内容逐字节一致，且启动器和核心的执行权限保留。未来工作流使用标准 UTF-8 ZIP 生成器。
 - Android 远端附件 digest 与此前本地已验签 APK 完全一致。没有更换证书或重新签名。
 - 原开发阶段的检查与未验收项目见 `VERIFICATION.md`。本轮没有重新进行安卓全量测试或真机续读验收。
+- Windows 静态资源后续修复已发布，详见 `WINDOWS-STATIC-FIX.md`。新版在真正的 Windows 环境中通过 12 项测试，且对实际 ZIP 解压后启动的 CSS / JavaScript 请求再次验证通过。
 
 最终网页 ZIP SHA-256：
 
 ```text
-9bac946aad46fca09c8d30cd1e81c3e2157507946495c77cc6b10381bebecde7  DocLeaf-Sync-Windows-x64.zip
+c34fe007da8d0d9ecaeb5d82f5af66f79b6226091a4b0024003c8a4b520f59de  DocLeaf-Sync-Windows-x64.zip
 08c70dfd82150276d2c6f006f94d3f04b5525f469cd2ec1e6892ef0cbc2e51fc  DocLeaf-Sync-macOS-Apple-Silicon.zip
 baf293921f13caff7b7ce30aec404f7309bd8544e526bf1deabc8707c86d436c  DocLeaf-Sync-macOS-Intel.zip
 ```
