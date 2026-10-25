@@ -59,7 +59,7 @@ jobs:
           set -euo pipefail
           mkdir -p staging
           node scripts/package-web-release.mjs staging/DocLeaf-Sync integrations/fqapp/rust/target/release/docleaf_bridge
-          ditto -c -k --keepParent staging/DocLeaf-Sync DocLeaf-Sync-${{ matrix.suffix }}.zip
+          python3 scripts/zip-web-release.py staging/DocLeaf-Sync DocLeaf-Sync-${{ matrix.suffix }}.zip
       - uses: actions/upload-artifact@v4
         with:
           name: web-${{ matrix.suffix }}

@@ -1,6 +1,6 @@
 # 同步试用版验证记录 · 2026-10-25
 
-本轮仅更新独立的 `zouy3/docleaf-sync`。原 `docleaf-reader` 和原 Android 工作目录未修改，未创建 GitHub Release。
+这是初始开发阶段的验证记录，当时仅更新独立的 `zouy3/docleaf-sync`，未创建 GitHub Release；原 `docleaf-reader` 和原 Android 工作目录未修改。之后的发布验收与下载信息见 `RELEASE.md`。
 
 - 网页 `npm test`：生产构建成功，8 项测试通过。覆盖服务端页面渲染、账号命名兼容、离线队列恢复、账号隔离、冲突选择、上传期间的新进度保留、重启序号、Emoji 定位片段。
 - 从实际上传清单重建全新源码目录，还原全部 61 个二进制资源后再次执行 `npm test`，构建和 8 项测试通过。远端 10 个关键文件的 Git blob SHA 与本地一致，包括双端同步服务、位置协议、阅读页及构建输入。
