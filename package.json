@@ -11,7 +11,7 @@
     "dev:full": "bash scripts/start-with-fqapp.sh",
     "source": "RUSTUP_HOME=./work/rustup CARGO_HOME=./work/cargo PATH=./work/cargo/bin:$PATH cargo run --manifest-path integrations/fqapp/rust/Cargo.toml --bin docleaf_bridge",
     "build": "vinext build",
-    "start": "vinext start",
+    "start": "node scripts/start-reader.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"

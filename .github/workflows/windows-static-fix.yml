@@ -1,0 +1,92 @@
+name: Repair Windows static resources release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/windows-static-fix.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-static-release-fix
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: integrations/fqapp/rust
+          key: Windows-x64
+      - run: npm ci
+      - name: Build and test, including actual Windows CSS and JavaScript requests
+        run: npm test
+      - name: Build source service
+        run: cargo build --release --locked --manifest-path integrations/fqapp/rust/Cargo.toml --bin docleaf_bridge
+      - name: Package reader
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force staging | Out-Null
+          node scripts/package-web-release.mjs staging/DocLeaf-Sync integrations/fqapp/rust/target/release/docleaf_bridge.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Compress-Archive -Path staging/DocLeaf-Sync -DestinationPath DocLeaf-Sync-Windows-x64.zip -CompressionLevel Optimal
+      - name: Verify the actual extracted ZIP in Windows
+        shell: pwsh
+        run: |
+          Expand-Archive DocLeaf-Sync-Windows-x64.zip release-verify
+          node scripts/check-production-assets.mjs release-verify/DocLeaf-Sync
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-static-fix
+          path: DocLeaf-Sync-Windows-x64.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-static-fix
+          path: fixed
+      - name: Replace Windows package and update its checksum only
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: sync-preview-2026-10-25
+        run: |
+          set -euo pipefail
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern SHA256SUMS-web.txt --dir fixed
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          name = 'DocLeaf-Sync-Windows-x64.zip'
+          root = Path('fixed')
+          digest = hashlib.sha256((root/name).read_bytes()).hexdigest()
+          checksums = root/'SHA256SUMS-web.txt'
+          lines = checksums.read_text().splitlines()
+          matching = [line for line in lines if line.split()[-1] == name]
+          assert len(matching) == 1
+          checksums.write_text('\n'.join(digest+'  '+name if line in matching else line for line in lines)+'\n')
+          PY
+          gh release upload "$RELEASE_TAG" fixed/DocLeaf-Sync-Windows-x64.zip fixed/SHA256SUMS-web.txt --repo "$GITHUB_REPOSITORY" --clobber
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > notes.md
+          if ! grep -q 'Windows 静态资源修复' notes.md; then
+            printf '\n## Windows 静态资源修复\n\n修复生产模式下 CSS 和 JavaScript 的路径兼容问题。已在 Windows 上运行真实资源请求测试，并对解压后的 ZIP 再次验证。请重新下载 Windows ZIP，解压到新目录，关闭旧服务后再启动；无需删除浏览器书架。Mac 和安卓包未替换。\n\n修复源码：https://github.com/%s/commit/%s\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA" >> notes.md
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file notes.md
+          fi
