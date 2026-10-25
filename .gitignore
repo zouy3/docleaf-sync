@@ -1,0 +1,89 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/.vinext/
+/out/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+next-env.d.ts
+/dist/
+/.wrangler/
+/outputs/
+/work/
+/release/
+/integrations/fqapp/rust/target/
+/integrations/fqapp/.docleaf-data/
+**/node_modules/
+**/target/
+**/build/
+**/.dart_tool/
+**/.gradle/
+**/local.properties
+**/keystore.properties
+**/key.properties
+*.jks
+*.keystore
+*.p12
+*.so
+*.apk
+*.zip
+*.tsbuildinfo
+**/device_pool.json
+/android-app/.github/
+/android-app/.pi/
+/android-app/.zcode/
+/android-app/.workbuddy/
+/android-app/docs/
+/android-app/.agents/
+/android-app/release-archives/
+/.openai/
+!/.openai/
+/.openai/*
+!/.openai/hosting.json
+!/build/
+/build/*
+!/build/sites-vite-plugin.ts
+/integrations/fqapp/*
+!/integrations/fqapp/rust/
+!/integrations/fqapp/assets/
+!/integrations/fqapp/.cargo/
+!/integrations/fqapp/LICENSE
+# Canonical images are transported by sync/binary-assets.json for GitHub MCP.
+# npm ci restores these generated copies; do not commit duplicate binaries.
+/android-app/android/app/src/main/res/mipmap-*/*.png
+/android-app/assets/branding/*.png
+/android-app/assets/images/**/*.webp
+/android-app/windows/runner/resources/*.ico
+/integrations/fqapp/assets/**/*.png
+/integrations/fqapp/assets/**/*.webp
+/integrations/fqapp/assets/**/*.woff2
