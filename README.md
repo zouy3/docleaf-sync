@@ -13,7 +13,7 @@ Word 风格的网页阅读器 + Android 纯文字小说客户端，共用账号�
 - Windows：`DocLeaf-Sync-Windows-x64.zip`
 - Mac M 系列：`DocLeaf-Sync-macOS-Apple-Silicon.zip`
 - Mac Intel：`DocLeaf-Sync-macOS-Intel.zip`
-- 安卓：`DocLeaf-Sync-1.0.132-arm64-v8a.apk`（多数手机）或 `armeabi-v7a.apk`（32 位）
+- 安卓：[1.0.133 应用内更新试用版](https://github.com/zouy3/docleaf-sync/releases/tag/android-v1.0.133)，选择 `arm64-v8a.apk`（多数手机）或 `armeabi-v7a.apk`（32 位）。更新入口在“关于 → 检查更新”，账号入口在“我的”顶部。旧版需手动覆盖安装本版一次，不要卸载清数据。
 
 网页包已带编译好的书源及网页构建产物，无需 Rust、Flutter 或 C++ 构建工具，仍需 Node.js 22.13+ 和首次依赖下载。完整解压后运行启动器；先关闭旧版服务，防止仍打开旧的 localhost:3000 页面。不要把 GitHub 自动生成的 Source code ZIP 当成运行包。
 

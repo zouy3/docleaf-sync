@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/home/home_design.dart';
+import 'app_update_page.dart';
 
 /// About page styled after PiliPlus: centered logo/name header followed by
 /// grouped card rows (version, source code, feedback, ...).
@@ -12,7 +13,7 @@ class AboutPage extends StatelessWidget {
   /// `version`. Without a package_info dependency the value is
   /// static, so test/about_version_test.dart parses the pubspec and fails the
   /// build check when the two drift apart after a version bump.
-  static const versionText = '1.0.132 (137)';
+  static const versionText = '1.0.133 (138)';
 
   /// Pixel width of the bundled logo (assets/images/app_logo.webp). The logo
   /// is displayed at 96dp, so it only needs re-decoding above 4× DPI; clamping
@@ -91,6 +92,18 @@ class AboutPage extends StatelessWidget {
                 trailingText: AboutPage.versionText,
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: FilledButton.icon(
+              icon: const Icon(Icons.system_update),
+              label: const Text('检查更新'),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => const AppUpdatePage()),
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           const _AboutCard(

@@ -24,6 +24,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
 
         flutterEngine.plugins.add(ReaderDevicePlugin())
+        flutterEngine.plugins.add(AppUpdatePlugin())
         flutterEngine.plugins.add(LocalBookPickerPlugin())
         flutterEngine.plugins.add(LibraryBackupPlugin())
         flutterEngine.plugins.add(FanqieAccountPlugin())

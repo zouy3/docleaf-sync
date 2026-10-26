@@ -11,6 +11,16 @@ import 'reader_page_curl.dart';
 import 'reader_illustration.dart';
 import 'reader_text_selection.dart';
 
+/// Small deliberate horizontal gestures should work equally at either edge.
+/// The horizontal recognizer still arbitrates against vertical scroll/selection.
+int? readerSwipeDirection(double delta, double velocity, double width) {
+  final distance = (width * 0.06).clamp(24.0, 36.0);
+  final flick =
+      delta.abs() >= 12 && velocity.abs() >= 350 && delta.sign == velocity.sign;
+  if (delta.abs() < distance && !flick) return null;
+  return delta < 0 ? 1 : -1;
+}
+
 /// One chapter boundary, animated instead of swapped.
 ///
 /// Between chapters the reader rebuilds the whole pagination, so there is no
@@ -138,7 +148,10 @@ class _ReaderPageScrollPhysics extends PageScrollPhysics {
       _ReaderPageScrollPhysics(parent: buildParent(ancestor));
 
   @override
-  Simulation? createBallisticSimulation(ScrollMetrics position, double velocity) {
+  Simulation? createBallisticSimulation(
+    ScrollMetrics position,
+    double velocity,
+  ) {
     final simulation = super.createBallisticSimulation(position, velocity);
     if (simulation == null) return null;
     final width = position.viewportDimension;
@@ -162,6 +175,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
   int? _dragStartItem;
   double _swipeStartDx = 0;
   double _swipeLastDx = 0;
+  double _pageGestureStart = 0, _pageGestureLast = 0;
   Drag? _pageDrag;
   int _pageDragFrom = 0;
   int? _pageDragDirection;
@@ -417,9 +431,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         notification.dragDetails != null) {
       _overscroll = 0;
       _edgeNotified = false;
-      _dragStartItem = _controller.hasClients
-          ? _attachedPage?.round()
-          : null;
+      _dragStartItem = _controller.hasClients ? _attachedPage?.round() : null;
       widget.onDragStart();
     }
     if (notification is OverscrollNotification &&
@@ -453,6 +465,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         final position = _attachedPosition;
         if (position == null || !position.haveDimensions) return;
         _pageDragFrom = _attachedPage!.round();
+        _pageGestureStart = _pageGestureLast = details.globalPosition.dx;
         _pageDragDirection = null;
         _pageDrag = position.drag(details, () => _pageDrag = null);
       },
@@ -460,6 +473,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         final drag = _pageDrag;
         final position = _attachedPosition;
         if (drag == null || position == null) return;
+        _pageGestureLast = details.globalPosition.dx;
         final delta = details.primaryDelta ?? 0;
         if (delta == 0) return;
         final direction = _pageDragDirection ??= delta < 0 ? 1 : -1;
@@ -486,47 +500,69 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         );
       },
       onHorizontalDragEnd: (details) {
-        final page = _attachedPage;
-        final direction = _pageDragDirection;
-        final velocity = details.primaryVelocity ?? 0;
-        if (page != null && direction != null) {
-          final first = _pageDragFrom + (direction < 0 ? -1 : 0);
-          final last = _pageDragFrom + (direction > 0 ? 1 : 0);
-          // Reaching the edge already completes the turn; inertia must not
-          // advance beyond the two pages held by this gesture.
-          if ((velocity < 0 && page >= last) ||
-              (velocity > 0 && page <= first)) {
-            details = DragEndDetails(primaryVelocity: 0);
-          }
+        if (_pageDrag == null) return;
+        final intended = readerSwipeDirection(
+          _pageGestureLast - _pageGestureStart,
+          details.primaryVelocity ?? 0,
+          _attachedPosition?.viewportDimension ?? 400,
+        );
+        final direction = intended == _pageDragDirection ? intended : null;
+        _cancelPageDrag();
+        if (_boundaryPending || _edgeNotified) return;
+        final target = _pageDragFrom + (direction ?? 0);
+        if (target < 0 || target >= _itemCount) {
+          if (direction != null) unawaited(_requestBoundary(direction));
+        } else {
+          unawaited(_settleShortDrag(target));
         }
-        _pageDrag?.end(details);
-        _pageDrag = null;
       },
       onHorizontalDragCancel: _cancelPageDrag,
       child: child,
     );
   }
 
-  /// 滑动直翻：把页面内容包一层水平拖拽识别。越过阈值（屏宽 20%）时直接
+  Future<void> _settleShortDrag(int target) async {
+    final controller = _controller;
+    if (!controller.hasClients) return;
+    _turning = true;
+    try {
+      await controller.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      if (identical(controller, _controller)) _turning = false;
+    }
+  }
+
+  /// 滑动直翻：短距离有意横滑或快速轻甩即可翻页，门槛不随大屏无限增大。
+  ///
   /// 翻页，不显示 PageView 的滑动预览/动画。它位于页面内容（PageView 子节点）
   /// 之上，比 PageView 自身的拖拽识别器更深，从而在手势竞技场中获胜。
   Widget _wrapSwipe(Widget child) {
-    if (!widget.instantSwipe) return child;
+    if (!widget.instantSwipe && widget.turnStyle != ReaderPageTurnStyle.none) {
+      return child;
+    }
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
+      dragStartBehavior: DragStartBehavior.down,
       onHorizontalDragStart: (details) {
         _swipeStartDx = details.globalPosition.dx;
         _swipeLastDx = details.globalPosition.dx;
+        widget.onDragStart();
       },
       onHorizontalDragUpdate: (details) {
         _swipeLastDx = details.globalPosition.dx;
       },
-      onHorizontalDragEnd: (_) {
+      onHorizontalDragEnd: (details) {
         final delta = _swipeLastDx - _swipeStartDx;
-        final threshold = MediaQuery.sizeOf(context).width * 0.2;
-        if (delta.abs() > threshold) {
-          unawaited(turnPage(delta < 0 ? 1 : -1));
-        }
+        final direction = readerSwipeDirection(
+          delta,
+          details.primaryVelocity ?? 0,
+          context.size?.width ?? MediaQuery.sizeOf(context).width,
+        );
+        if (direction != null) unawaited(turnPage(direction));
       },
       child: child,
     );
@@ -540,6 +576,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
     if (widget.turnStyle != ReaderPageTurnStyle.curl) return child;
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
+      dragStartBehavior: DragStartBehavior.down,
       onHorizontalDragStart: (details) {
         if (_turning || _boundaryPending) return;
         _curlDragStartDx = details.globalPosition.dx;
@@ -559,8 +596,8 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         if (!_curlDragLocked) {
           if (delta.abs() < 6) return;
           final direction = delta < 0 ? 1 : -1;
-          final current =
-              (_attachedPage ?? widget.pageIndex.toDouble()).round();
+          final current = (_attachedPage ?? widget.pageIndex.toDouble())
+              .round();
           final target = current + direction;
           _curlDragLocked = true;
           if (target < 0 || target >= _itemCount) {
@@ -590,12 +627,8 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         // when the finger crosses back past the drag start. The 2px
         // deadband absorbs touch jitter.
         final direction = _curlTurn!.direction;
-        final retreated = direction > 0
-            ? dx > prevDx + 2
-            : dx < prevDx - 2;
-        final advanced = direction > 0
-            ? dx < prevDx - 2
-            : dx > prevDx + 2;
+        final retreated = direction > 0 ? dx > prevDx + 2 : dx < prevDx - 2;
+        final advanced = direction > 0 ? dx < prevDx - 2 : dx > prevDx + 2;
         if (retreated) {
           _curlDragCancelled = true;
         } else if (advanced) {
@@ -648,9 +681,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         fit: StackFit.expand,
         children: [
           pager,
-          Positioned.fill(
-            child: IgnorePointer(child: _buildCurlOverlay()),
-          ),
+          Positioned.fill(child: IgnorePointer(child: _buildCurlOverlay())),
         ],
       );
     }
@@ -710,6 +741,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         physics:
             (_boundaryPending ||
                 widget.instantSwipe ||
+                widget.turnStyle == ReaderPageTurnStyle.none ||
                 _followsFinger ||
                 widget.turnStyle == ReaderPageTurnStyle.curl)
             ? NeverScrollableScrollPhysics(
@@ -733,7 +765,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
         itemBuilder: (context, index) {
           final page = index;
           if (page >= widget.layout.pages.length) {
-            return widget.endPage!;
+            return _wrapCurl(_wrapSwipe(widget.endPage!));
           }
           Widget content = ReaderPageContent(
             key: ValueKey('reader-text-page-$page'),
@@ -816,8 +848,7 @@ class ReaderPagedViewState extends State<ReaderPagedView>
       animation: _chapterTurnAnimation,
       builder: (context, _) {
         final t = Curves.easeOutCubic.transform(_chapterTurnAnimation.value);
-        final width =
-            (_attachedPosition?.hasContentDimensions ?? false)
+        final width = (_attachedPosition?.hasContentDimensions ?? false)
             ? _viewportWidth
             : MediaQuery.sizeOf(context).width;
         final outgoingShift = cover ? 0.0 : (forward ? -width * t : width * t);
@@ -963,10 +994,9 @@ class ReaderPageContent extends StatelessWidget {
                                   ),
                             onLongPressEnd: onParagraphLongPressEnd == null
                                 ? null
-                                : (details) =>
-                                      onParagraphLongPressEnd!(
-                                        details.globalPosition,
-                                      ),
+                                : (details) => onParagraphLongPressEnd!(
+                                    details.globalPosition,
+                                  ),
                             child: body,
                           ),
                         );

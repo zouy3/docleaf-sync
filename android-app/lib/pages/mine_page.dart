@@ -7,6 +7,8 @@ import 'cached_books_page.dart';
 import 'settings_page.dart';
 import 'stats_page.dart';
 import 'cloud_sync_page.dart';
+import '../services/cloud_sync.dart';
+import 'app_update_page.dart';
 
 /// 个人中心（我的）页：顶部书友卡片 + 快捷入口（章节缓存/剧集缓存/设置/关于）
 /// + 嵌入式阅读统计。
@@ -46,7 +48,11 @@ class MinePage extends StatelessWidget {
           ),
         ],
       ),
-      body: StatsPage(header: _buildProfileHeader(context, scheme, palette)),
+      body: ListenableBuilder(
+        listenable: CloudSync.instance,
+        builder: (context, _) =>
+            StatsPage(header: _buildProfileHeader(context, scheme, palette)),
+      ),
     );
   }
 
@@ -59,100 +65,115 @@ class MinePage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 个人概览卡片
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: palette.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: palette.line, width: 0.6),
+        GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const CloudSyncPage()),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFEF5038), Color(0xFFF27A65)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: HomePalette.accent.withValues(alpha: 0.22),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  LucideIcons.circle_user_round,
-                  color: Colors.white,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '书友',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: palette.ink,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '沉浸阅读，记录每一个好故事',
-                      style: TextStyle(fontSize: 12.5, color: palette.muted),
-                    ),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
-                ),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 6,
-                  ),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: palette.line, width: 0.6),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
-                    color: palette.soft,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: palette.line, width: 0.5),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        LucideIcons.sliders_horizontal,
-                        size: 13,
-                        color: palette.accentText,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFEF5038), Color(0xFFF27A65)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: HomePalette.accent.withValues(alpha: 0.22),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
                       ),
-                      const SizedBox(width: 4),
+                    ],
+                  ),
+                  child: const Icon(
+                    LucideIcons.circle_user_round,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '设置',
+                        CloudSync.instance.session == null
+                            ? '登录并同步'
+                            : CloudSync.instance.account,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: palette.accentText,
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: palette.ink,
                         ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        CloudSync.instance.session == null
+                            ? '点击登录，与网页同步书架和进度'
+                            : CloudSync.instance.status,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.5, color: palette.muted),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
+                GestureDetector(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CloudSyncPage()),
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: palette.soft,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: palette.line, width: 0.5),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.manage_accounts_outlined,
+                          size: 13,
+                          color: palette.accentText,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          CloudSync.instance.session == null ? '登录' : '管理',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: palette.accentText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 12),
+        const AppUpdateNotice(),
         // 4个快捷入口
         Row(
           children: [

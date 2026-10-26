@@ -24,12 +24,18 @@ import 'services/library_store.dart';
 import 'services/rank_cache.dart';
 import 'services/shelf_store.dart';
 import 'services/cloud_sync.dart';
+import 'services/app_update.dart';
 import 'widgets/lazy_indexed_stack.dart';
 import 'widgets/home/home_design.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   unawaited(CloudSync.instance.init().catchError((Object _) {}));
+  unawaited(
+    AppUpdateService.instance
+        .initialize(autoCheck: true)
+        .catchError((Object _) {}),
+  );
   if (isWindowsDesktop) await DesktopPlatform.instance.initialize();
   // 应用内日志：接管 debugPrint 与 FlutterError.onError，未处理异步异常由
   // runZonedGuarded 捕获；文件持久化异步开启，失败只退回内存模式。

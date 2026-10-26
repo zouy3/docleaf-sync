@@ -28,7 +28,9 @@ class CloudSync extends ChangeNotifier with WidgetsBindingObserver {
   String _device = '';
   String get deviceId => _device;
   String get account =>
-      session?['user']?['user_metadata']?['username']?.toString() ?? '已登录';
+      session?['user']?['user_metadata']?['username']?.toString() ??
+      session?['user']?['email']?.toString().split('@').first ??
+      '已登录';
   String get _accountKey => 'docleaf-sync:${session!['user']['id']}';
 
   Future<void> init() =>
