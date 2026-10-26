@@ -21,6 +21,7 @@ Map<String, dynamic> manifest({int code = 138}) => {
   'assets': [
     {
       'abi': 'arm64-v8a',
+      'versionCode': code,
       'name': 'DocLeaf-Sync-1.0.133-arm64-v8a.apk',
       'sha256': sha256.convert(payload).toString(),
       'size': payload.length,
@@ -116,6 +117,26 @@ void main() {
         manifest(),
         release(),
         const UpdateDevice('com.fqapp.fqapp', 137, '1.0.132', ['x86_64']),
+      ),
+      isNull,
+    );
+  });
+  test('split APK installation code is distinct from base release code', () {
+    final m = manifest();
+    (m['assets'] as List)[0]['versionCode'] = 2138;
+    const installed = UpdateDevice('com.fqapp.fqapp', 2137, '1.0.132', [
+      'arm64-v8a',
+    ], baseCode: 137);
+    final next = AppUpdate.parse(m, release(), installed)!;
+    expect(next.code, 138);
+    expect(next.apkVersionCode, 2138);
+    expect(
+      AppUpdate.parse(
+        m,
+        release(),
+        const UpdateDevice('com.fqapp.fqapp', 2138, '1.0.133', [
+          'arm64-v8a',
+        ], baseCode: 138),
       ),
       isNull,
     );

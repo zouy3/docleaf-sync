@@ -6,9 +6,9 @@
 
 ## 后续发布流程
 
-1. 同步递增 `android-app/pubspec.yaml` 与 About 页版本，保持 `com.fqapp.fqapp` 和原有签名证书不变。
+1. 同步递增 `android-app/pubspec.yaml` 与 `lib/services/app_version.dart` 的基础版本，About 页自动使用同一常量，测试会校验一致性。保持 `com.fqapp.fqapp` 和原有签名证书不变。
 2. 生成两个已签名 APK，执行现有 APK 验签、ABI 与对齐检查。命名为 `DocLeaf-Sync-版本号-arm64-v8a.apk`、`DocLeaf-Sync-版本号-armeabi-v7a.apk`，放进独立输出目录。
-3. 在仓库根目录执行 `node scripts/create-android-update-manifest.mjs 输出目录`，会生成 `android-update.json`。若文件已存在则拒绝覆盖，防止混入旧清单。
+3. 设置 Android SDK 的 `ANDROID_HOME`，在仓库根目录执行 `node scripts/create-android-update-manifest.mjs 输出目录`，会使用 build-tools 36.0.0 的 aapt 读取每个 APK 的真实安装版本，再生成 `android-update.json`。Flutter 分架构 APK 的安装 versionCode 不同于 pubspec 基础版本：例如基础 138 对应 ARM64 2138、ARMv7 1138；不能把基础号用于原生安装核对。若清单已存在则拒绝覆盖，防止混入旧文件。
 4. 新建对应版本的 Release（例如 `android-v1.0.133`），上传两个 APK 并确认上传成功后，**最后上传 `android-update.json`**。不要只覆盖旧 APK 或只改 Release 标题。
 5. 正式版请取消 Pre-release；试用版保留 Pre-release。应用会读取最近发布列表，过滤草稿和当前渠道，并按清单的 Android versionCode 选择更高版本；不依赖忽略试用版的 `/latest` 接口，网页版更新不会冒充 Android 更新。
 

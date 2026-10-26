@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fqapp/pages/about_page.dart';
+import 'package:fqapp/services/app_version.dart';
 
 /// The about page shows a static version string (no package_info dependency),
 /// so this guard keeps it from silently drifting away from pubspec.yaml after
@@ -18,5 +19,10 @@ void main() {
         '${match!.group(1)}.${match.group(2)}.${match.group(3)} '
         '(${match.group(4)})';
     expect(AboutPage.versionText, expected);
+    expect(AppVersion.code, int.parse(match.group(4)!));
+    expect(
+      AppVersion.name,
+      '${match.group(1)}.${match.group(2)}.${match.group(3)}',
+    );
   });
 }

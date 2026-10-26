@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'platform_channel.dart';
+import 'app_version.dart';
 
 enum UpdateChannel { stable, preview }
 
@@ -15,16 +16,18 @@ class UpdateDevice {
     this.packageName,
     this.versionCode,
     this.versionName,
-    this.abis,
-  );
+    this.abis, {
+    int? baseCode,
+  }) : baseVersionCode = baseCode ?? versionCode;
   final String packageName, versionName;
-  final int versionCode;
+  final int versionCode, baseVersionCode;
   final List<String> abis;
   factory UpdateDevice.fromMap(Map value) => UpdateDevice(
     value['packageName'] as String,
     (value['versionCode'] as num).toInt(),
     value['versionName'] as String,
     List<String>.from(value['abis'] as List),
+    baseCode: AppVersion.code,
   );
 }
 
@@ -32,6 +35,7 @@ class AppUpdate {
   const AppUpdate({
     required this.version,
     required this.code,
+    required this.apkVersionCode,
     required this.abi,
     required this.filename,
     required this.hash,
@@ -41,7 +45,7 @@ class AppUpdate {
     required this.notes,
   });
   final String version, abi, filename, hash, notes;
-  final int code, size;
+  final int code, apkVersionCode, size;
   final Uri download, releaseUrl;
 
   static bool trustedAsset(Uri uri) =>
@@ -66,7 +70,7 @@ class AppUpdate {
         !RegExp(r'^\d+\.\d+\.\d+$').hasMatch(version)) {
       throw const FormatException('更新版本信息不正确');
     }
-    if (code <= device.versionCode) return null;
+    if (code <= device.baseVersionCode) return null;
     final assets = release['assets'] as List;
     for (final abi in device.abis) {
       final entries = (manifest['assets'] as List)
@@ -75,6 +79,11 @@ class AppUpdate {
       if (entries.isEmpty) continue;
       if (entries.length != 1) throw const FormatException('更新包架构重复');
       final a = entries.single as Map;
+      final apkCode = a['versionCode'];
+      if (apkCode is! int || apkCode < code) {
+        throw const FormatException('APK 安装版本号不正确');
+      }
+      if (apkCode <= device.versionCode) continue;
       final name = 'DocLeaf-Sync-$version-$abi.apk';
       if (a['name'] != name ||
           a['sha256'] is! String ||
@@ -110,6 +119,7 @@ class AppUpdate {
       return AppUpdate(
         version: version,
         code: code,
+        apkVersionCode: apkCode,
         abi: abi,
         filename: name,
         hash: a['sha256'] as String,
@@ -436,7 +446,7 @@ class AppUpdateService extends ChangeNotifier {
       }
       final result = await platform.invokeMethod<String>('install', {
         'path': apk!.path,
-        'versionCode': candidate!.code,
+        'versionCode': candidate!.apkVersionCode,
       });
       if (result == 'permission_required') {
         status = '请允许本应用安装更新，再返回点击安装';
